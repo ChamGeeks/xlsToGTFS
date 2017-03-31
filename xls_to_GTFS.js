@@ -92,11 +92,9 @@ async function tripsTxt () {
   console.log(trips)
 }
 
-try {
-  tripsTxt()
-} catch (e) {
-  console.error(e)
-}
+/**
+ * Helper function
+ */
 
 function readdirPromise (dir) {
   return new Promise((resolve, reject) => {
@@ -107,7 +105,6 @@ function readdirPromise (dir) {
   })
 }
 
-
 function arrayEquals (a1, a2) {
   if (!a1 || !a2 || a1.length != a2.length) return false
 
@@ -116,3 +113,13 @@ function arrayEquals (a1, a2) {
   }
   return true
 }
+
+/**
+ * Run the code!
+ */
+
+// Get routes.txt
+// console.log(routesTxt())
+
+// Get trips.txt WIP
+tripsTxt()
