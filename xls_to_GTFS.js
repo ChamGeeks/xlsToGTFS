@@ -1,5 +1,6 @@
 const fs = require('fs')
 const xlsx = require('node-xlsx').default
+const XLSX = require('xlsx')
 
 // Période
 // semaine = week
@@ -43,16 +44,27 @@ function routesTxt () {
  * Trips.txt
  *
  * route_id, service_id, trip_id, trip_headsign, direction_id, block_id, shape_id
+ *
+ * Stop_times.txt
+ *
+ * trip_id, arrival_time, departure_time, stop_id, stop_sequence,
+ * stop_headsign, pickup_type, drop_off_time, shape_dist_traveled
  */
-async function tripsTxt () {
+async function tripsTxt (stops) {
   const trips = []
+  const stopTimes = []
   const timetablesDir = `${__dirname}/chamonix/timetables`;
   const timetableFiles = await readdirPromise(timetablesDir)
 
   for (const lineFile of timetableFiles) {
     const route_id = parseInt(lineFile, 10)
-    const lineExcel = xlsx.parse(`${__dirname}/chamonix/timetables/${lineFile}`)
-    const lineSheet = lineExcel[0].data
+    const file = `${__dirname}/chamonix/timetables/${lineFile}`
+    // const lineExcel = xlsx.parse(file)
+    // const lineSheet = lineExcel[0].data
+
+    const workSheet = XLSX.readFile(file)
+    const sheet = workSheet.Sheets.Feuil1
+    const lineSheet = XLSX.utils.sheet_to_json(sheet, {header: 1, raw: false})
 
     // Remove header
     lineSheet.shift()
@@ -73,15 +85,38 @@ async function tripsTxt () {
         continue
       }
       const trip_id = `${route_id}_${direction}`
+      const [trip_headsign, stopName, service_id, ...times] = line
+
+      // Save stop_imes
+
+      const stop = stops.find((stop) => stop[1].trim() === stopName.trim())
+      for (let i = 0; i < times.length; i++) {
+        const time = times[i] && times[i].match(/[0-9]{2}:[0-9]{2}/) ? times[i] : ''
+
+        stopTimes.push([
+          trip_id,
+          time, // arrival_time,
+          time, // departure_time,
+          stop[0], // stop_id,
+          i, // stop_sequence,
+          stopName, // stop_headsign,
+          0, // pickup_type,
+          0, //drop_off_time,
+          '', // shape_dist_traveled,
+          0 // timepoint
+        ])
+      }
+
+      // Save trips
 
       if (savedTrips.includes(trip_id)) continue
       savedTrips.push(trip_id)
 
       trips.push([
         route_id,
-        line[2], // service_id,
+        service_id,
         trip_id,
-        line[0], // trip_headsign,
+        trip_headsign,
         direction, // direction_id,
         '', // block_id,
         '' //shape_id
@@ -90,6 +125,49 @@ async function tripsTxt () {
   }
 
   console.log(trips)
+  console.log('-----\n-----\n-----\n-----\n-----\n-----\n-----\n')
+  console.log(stopTimes)
+}
+
+/**
+ * Stops.txt
+ *
+ * stop_id, stop_name, stop_desc, stop_lat, stop_lon, zone_id, stop_url
+ */
+async function stopsTxt () {
+  const stops = []
+  const stopsDir = `${__dirname}/chamonix/busstops`;
+  const stopsFiles = await readdirPromise(stopsDir)
+
+  for (const lineFile of stopsFiles) {
+    const file = `${__dirname}/chamonix/busstops/${lineFile}`
+    const lineExcel = xlsx.parse(file)
+    const lineSheet = lineExcel[0].data
+    // Remove header
+    lineSheet.shift()
+    const rows = lineSheet.filter((row) => row.length)
+
+    for (const row of rows) {
+      const hasStop = stops.find((stop) => stop[1].trim() === row[1].trim())
+      if (!hasStop) stops.push(row)
+    }
+  }
+
+  // const stopNames = stops.map((stop) => stop[1]).sort()
+  // console.log(stopNames)
+
+  return stops.map((stop, index) => {
+    const [ , stop_name, stop_lat, stop_lon ] = stop
+    return [
+      index, // stop_id
+      stop_name,
+      '', // stop_desc
+      stop_lat,
+      stop_lon,
+      '', //zone_id,
+      '' //stop_url
+    ]
+  })
 }
 
 /**
@@ -121,5 +199,9 @@ function arrayEquals (a1, a2) {
 // Get routes.txt
 // console.log(routesTxt())
 
-// Get trips.txt WIP
-tripsTxt()
+// Get stops.txt WIP
+stopsTxt()
+  .then((stops) => {
+    // Get trips.txt WIP
+    tripsTxt(stops)
+  })

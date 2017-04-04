@@ -2,7 +2,7 @@
 # yarn lockfile v1
 
 
-adler-32@:
+adler-32@, adler-32@~1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/adler-32/-/adler-32-1.0.0.tgz#28728a71756f629666dd1653cd80793a9df18651"
   dependencies:
@@ -14,13 +14,13 @@ buffer-shims@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/buffer-shims/-/buffer-shims-1.0.0.tgz#9978ce317388c649ad8793028c3477ef044a8b51"
 
-cfb@~0.11.0:
+cfb@~0.11.0, cfb@~0.11.1:
   version "0.11.1"
   resolved "https://registry.yarnpkg.com/cfb/-/cfb-0.11.1.tgz#a96db8f272a6c3fb99dbbb23ef41223f48be1ea7"
   dependencies:
     commander ""
 
-codepage@:
+codepage@, codepage@~1.8.0:
   version "1.8.0"
   resolved "https://registry.yarnpkg.com/codepage/-/codepage-1.8.0.tgz#66bfb773b075294bcd5f385f0454292e608054bc"
   dependencies:
@@ -33,7 +33,7 @@ colors@0.6.2:
   version "0.6.2"
   resolved "https://registry.yarnpkg.com/colors/-/colors-0.6.2.tgz#2423fe6678ac0c5dae8852e5d0e5be08c997abcc"
 
-commander@:
+commander@, commander@~2.9.0:
   version "2.9.0"
   resolved "https://registry.yarnpkg.com/commander/-/commander-2.9.0.tgz#9c99094176e12240cb22d6c5146098400fe0f7d4"
   dependencies:
@@ -51,7 +51,7 @@ core-util-is@~1.0.0:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/core-util-is/-/core-util-is-1.0.2.tgz#b5fd54220aa2bc5ab57aab7140c940754503c1a7"
 
-crc-32@:
+crc-32@, crc-32@~1.0.0:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/crc-32/-/crc-32-1.0.1.tgz#2efbddb7ccbb7beb4d181803b10e33a29c9fd214"
   dependencies:
@@ -59,7 +59,7 @@ crc-32@:
     exit-on-epipe ""
     printj ""
 
-exit-on-epipe@:
+exit-on-epipe@, exit-on-epipe@~1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/exit-on-epipe/-/exit-on-epipe-1.0.0.tgz#f6e0579c8214d33a08109fd6e2e5c1dbc70463fc"
 
@@ -113,6 +113,14 @@ ssf@~0.8.1:
     frac "0.3.1"
     voc ""
 
+ssf@~0.9.0:
+  version "0.9.0"
+  resolved "https://registry.yarnpkg.com/ssf/-/ssf-0.9.0.tgz#eab445edc8c85bc1b637eaa62c3cf0ace92b7148"
+  dependencies:
+    colors "0.6.2"
+    frac "0.3.1"
+    voc ""
+
 string_decoder@~0.10.x:
   version "0.10.31"
   resolved "https://registry.yarnpkg.com/string_decoder/-/string_decoder-0.10.31.tgz#62e203bc41766c6c28c9fc84301dab1c5310fa94"
@@ -140,3 +148,15 @@ xlsx@^0.8.0:
     crc-32 ""
     exit-on-epipe ""
     ssf "~0.8.1"
+
+xlsx@^0.9.9:
+  version "0.9.9"
+  resolved "https://registry.yarnpkg.com/xlsx/-/xlsx-0.9.9.tgz#85a628139f0dd9c9bc36c5cc42cb27cdd831dfa4"
+  dependencies:
+    adler-32 "~1.0.0"
+    cfb "~0.11.1"
+    codepage "~1.8.0"
+    commander "~2.9.0"
+    crc-32 "~1.0.0"
+    exit-on-epipe "~1.0.0"
+    ssf "~0.9.0"
