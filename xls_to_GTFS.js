@@ -1,6 +1,109 @@
 const fs = require('fs')
 const xlsx = require('node-xlsx').default
 const XLSX = require('xlsx')
+const sqlite = require('sqlite')
+const leftPad = require('left-pad') // Why not ;)
+
+
+/**
+ * Run the code!
+ */
+
+async function main() {
+
+  // Get data
+  const routes = routesTxt()
+  const stops = await stopsTxt()
+  const tripsAndStops = await tripsAndStopTimesTxt(stops)
+
+  // Save data
+  const db = await sqlite.open('./GTFS.sqlite')
+  await saveRoutesToDb(db, routes)
+  await saveStopsToDb(db, stops)
+  await saveTripsToDb(db, tripsAndStops.trips)
+  await saveStopTimesToDb(db, tripsAndStops.stopTimes)
+
+  // Fin!
+  console.log('Done')
+}
+main()
+
+
+async function saveRoutesToDb (db, routes) {
+  const drop = await db.run('DROP TABLE IF EXISTS routes')
+
+  const create = await db.run(`CREATE TABLE routes(
+    route_id TEXT, agency_id TEXT, route_short_name TEXT,
+    route_long_name TEXT, route_desc TEXT, route_type NUMERIC,
+    route_url TEXT, route_color TEXT, route_text_color TEXT
+  )`)
+
+  routes.forEach(async (route) => {
+    const insert = await db.run(`INSERT INTO routes
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, route)
+  })
+}
+
+async function saveStopsToDb (db, stops) {
+  const drop = await db.run('DROP TABLE IF EXISTS stops')
+
+  const create = await db.run(`CREATE TABLE stops(
+    stop_id TEXT, stop_name TEXT,
+    stop_desc TEXT, stop_lat REAL, stop_lon REAL,
+    zone_id NUMERIC, stop_url TEXT
+  )`)
+
+  await db.run(`CREATE INDEX stop_id_stops ON stops (stop_id)`)
+
+  stops.forEach(async (stop) => {
+    const insert = await db.run(`INSERT INTO stops
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, stop)
+  })
+}
+
+async function saveTripsToDb (db, trips) {
+  await db.run('DROP TABLE IF EXISTS trips')
+
+  await db.run(`CREATE TABLE trips(
+    route_id TEXT, service_id TEXT, trip_id TEXT,
+    trip_headsign TEXT, direction_id NUMERIC,
+    block_id TEXT, shape_id TEXT
+  )`)
+
+  await db.run(`CREATE INDEX route_id_trips ON trips (route_id)`)
+  await db.run(`CREATE INDEX trip_id_trips ON trips (trip_id)`)
+
+  trips.forEach(async (trip) => {
+    const insert = await db.run(`INSERT INTO trips
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, trip)
+  })
+}
+
+async function saveStopTimesToDb (db, trips) {
+  const drop = await db.run('DROP TABLE IF EXISTS stop_times')
+
+  const create = await db.run(`CREATE TABLE stop_times(
+    trip_id TEXT, arrival_time TEXT, departure_time TEXT,
+    stop_id TEXT, stop_sequence NUMERIC, stop_headsign TEXT,
+    pickup_type NUMERIC, drop_off_type NUMERIC, shape_dist_traveled TEXT,
+    timepoint NUMERIC
+  )`)
+
+  await db.run(`CREATE INDEX stop_id_stop_times ON stop_times (stop_id)`)
+  await db.run(`CREATE INDEX trip_id_stop_times ON stop_times (trip_id)`)
+  await db.run(`CREATE INDEX stop_sequence_stop_times ON stop_times (stop_sequence)`)
+
+  const inserted = []
+  trips.forEach(async (trip) => {
+    inserted.push(db.run(`INSERT INTO stop_times
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, trip))
+  })
+  return Promise.all(inserted)
+}
 
 // Période
 // semaine = week
@@ -48,9 +151,9 @@ function routesTxt () {
  * Stop_times.txt
  *
  * trip_id, arrival_time, departure_time, stop_id, stop_sequence,
- * stop_headsign, pickup_type, drop_off_time, shape_dist_traveled
+ * stop_headsign, pickup_type, drop_off_time, shape_dist_traveled, timepoint
  */
-async function tripsTxt (stops) {
+async function tripsAndStopTimesTxt (stops) {
   const trips = []
   const stopTimes = []
   const timetablesDir = `${__dirname}/chamonix/timetables`;
@@ -64,7 +167,7 @@ async function tripsTxt (stops) {
 
     const workSheet = XLSX.readFile(file)
     const sheet = workSheet.Sheets.Feuil1
-    const lineSheet = XLSX.utils.sheet_to_json(sheet, {header: 1, raw: false})
+    const lineSheet = XLSX.utils.sheet_to_json(sheet, {header: 1, raw: true})
 
     // Remove header
     lineSheet.shift()
@@ -79,19 +182,32 @@ async function tripsTxt (stops) {
     const savedTrips = []
 
     // @TODO Handle Période (different or the same)
+    let i = 0
     for (const line of lines) {
+
+      i++
       if (!line.length) {
         direction++
         continue
       }
-      const trip_id = `${route_id}_${direction}`
+      const trip_id = `${route_id}_${direction}_${i}`
       const [trip_headsign, stopName, service_id, ...times] = line
+      if (service_id.trim().toLowerCase() !== 'semaine') continue
 
       // Save stop_imes
 
+      // @TODO Wrong stop_id! trips go vaertical and times horizontal
+      //
+      // trip_headsign => Les Houches, times => 1,2,3,4,5 etc
+      // trip_headsign => Le Bossons, times => 2,3,4,5,5 etc
+
       const stop = stops.find((stop) => stop[1].trim() === stopName.trim())
       for (let i = 0; i < times.length; i++) {
-        const time = times[i] && times[i].match(/[0-9]{2}:[0-9]{2}/) ? times[i] : ''
+        let time = ''
+        if (!isNaN(times[i])) {
+          time = XLSX.SSF.parse_date_code(times[i])
+          time = `${leftPad(time.H, 2, 0)}:${leftPad(time.M, 2, 0)}`
+        }
 
         stopTimes.push([
           trip_id,
@@ -124,9 +240,10 @@ async function tripsTxt (stops) {
     }
   }
 
-  console.log(trips)
-  console.log('-----\n-----\n-----\n-----\n-----\n-----\n-----\n')
-  console.log(stopTimes)
+  return {
+    trips,
+    stopTimes
+  }
 }
 
 /**
@@ -192,16 +309,21 @@ function arrayEquals (a1, a2) {
   return true
 }
 
-/**
- * Run the code!
- */
 
-// Get routes.txt
-// console.log(routesTxt())
-
-// Get stops.txt WIP
-stopsTxt()
-  .then((stops) => {
-    // Get trips.txt WIP
-    tripsTxt(stops)
-  })
+// create table agency(agency_id TEXT,agency_name TEXT,agency_url TEXT,
+//                     agency_timezone TEXT,agency_lang TEXT, agency_phone TEXT);
+// create table calendar_dates(service_id TEXT,date NUMERIC,exception_type NUMERIC);
+// create table routes(route_id TEXT,agency_id TEXT,route_short_name TEXT,
+//                     route_long_name TEXT,route_desc TEXT,route_type NUMERIC,
+//                     route_url TEXT,route_color TEXT,route_text_color TEXT);
+// create table shapes(shape_id TEXT,shape_pt_lat REAL,shape_pt_lon REAL,
+//                     shape_pt_sequence NUMERIC);
+// create table stops(stop_id TEXT,stop_code TEXT,stop_name TEXT,
+//                    stop_desc TEXT,stop_lat REAL,stop_lon REAL,
+//                    zone_id NUMERIC,stop_url TEXT,timepoint NUMERIC);
+// create table stop_times(trip_id TEXT,arrival_time TEXT,departure_time TEXT,
+//                         stop_id TEXT,stop_sequence NUMERIC,stop_headsign TEXT,
+//                         pickup_type NUMERIC,drop_off_type NUMERIC);
+// create table trips(route_id TEXT,service_id TEXT,trip_id TEXT,
+//                    trip_headsign TEXT,direction_id NUMERIC,
+//                    block_id TEXT,shape_id TEXT);
