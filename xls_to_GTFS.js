@@ -4,6 +4,10 @@ const XLSX = require('xlsx')
 const sqlite = require('sqlite')
 const leftPad = require('left-pad') // Why not ;)
 
+// @TODO
+// 1. Fix trip and stop_times (They are saved wrong)
+
+
 
 /**
  * Run the code!
