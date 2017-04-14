@@ -206,7 +206,7 @@ async function tripsAndStopTimesTxt (stops) {
       savedTrips.push(trip_id)
 
       if (!routeTrips[direction]) routeTrips[direction] = []
-      routeTrips[direction].push({ trip_id, service_id, stopName, stop_sequence: i })
+      routeTrips[direction].push({ trip_id, service_id, stop_sequence: i })
 
       trips.push([
         route_id,
@@ -230,13 +230,13 @@ async function tripsAndStopTimesTxt (stops) {
         direction2++
         continue
       }
-      const [, , service_id, ...times] = line
+      const [, stopName, service_id, ...times] = line
       if (service_id.trim().toLowerCase() !== 'semaine') continue
 
       let j = 0
       for (const trip of routeTrips[direction2]) {
 
-        const stop = stops.find((stop) => stop[1].trim() === trip.stopName.trim())
+        const stop = stops.find((stop) => stop[1].trim() === stopName.trim())
         let time = ''
         if (!isNaN(times[j])) {
           time = XLSX.SSF.parse_date_code(times[j])
@@ -248,7 +248,7 @@ async function tripsAndStopTimesTxt (stops) {
           time, // departure_time,
           stop[0], // stop_id,
           trip.stop_sequence, // stop_sequence,
-          trip.stopName, // stop_headsign,
+          stopName, // stop_headsign,
           0, // pickup_type,
           0, //drop_off_time,
           '', // shape_dist_traveled,
