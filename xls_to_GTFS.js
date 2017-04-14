@@ -6,7 +6,7 @@ const leftPad = require('left-pad') // Why not ;)
 
 // @TODO
 // 1. Fix trip and stop_times (They are saved wrong)
-
+// Stop times are now saved by as many stops there is which is wrong
 
 
 /**
@@ -176,85 +176,71 @@ async function tripsAndStopTimesTxt (stops) {
     // Remove header
     lineSheet.shift()
 
-    const lines = lineSheet.filter((line, index, arr) => {
-      const hasContentOnNextRow = (arr[index + 1] && arr[index + 1].length)
-      const rowHasContent = line.length
-
-      return (rowHasContent || hasContentOnNextRow)
-    })
-    let direction = 0
-    const savedTrips = []
-    const routeTrips = {}
-
-    // @TODO Handle Période (different or the same)
-    let i = 0
-    for (const line of lines) {
-
-      i++
-      if (!line.length) {
-        direction++
-        let i = 0
-        continue
-      }
-      const trip_id = `${route_id}_${direction}_${leftPad(i, 3, 0)}`
-      const [trip_headsign, stopName, service_id, ...times] = line
-      if (service_id.trim().toLowerCase() !== 'semaine') continue
-
-      // Save trips
-
-      if (savedTrips.includes(trip_id)) continue
-      savedTrips.push(trip_id)
-
-      if (!routeTrips[direction]) routeTrips[direction] = []
-      routeTrips[direction].push({ trip_id, service_id, stop_sequence: i })
-
-      trips.push([
-        route_id,
-        service_id,
-        trip_id,
-        trip_headsign,
-        direction, // direction_id,
-        '', // block_id,
-        '' //shape_id
-      ])
+    /**
+     * Group directions
+     */
+    const tripGroups = {}
+    for (const line of lineSheet) {
+      if (!line.length) continue
+      const [headsign, /*stopName*/, service_id] = line
+      const tripIdName = `${headsign.toLowerCase().trim()}__${service_id.toLowerCase().trim()}`
+      if (!tripGroups[tripIdName]) tripGroups[tripIdName] = []
+      tripGroups[tripIdName].push(line)
     }
 
-    // Save stop_imes
+    /**
+     * Save trips
+     */
+    let directionId = 0
+    for (const tripGroup of Object.values(tripGroups)) {
+      directionId++
+      const tripIds = []
+      const [trip_headsign, /*stopName*/, service_id, ...tripTimes] = tripGroup[0]
 
-    // trip_headsign => Les Houches, times => 1,2,3,4,5 etc
-    // trip_headsign => Le Bossons, times => 2,3,4,5,5 etc
-    let direction2 = 0
-    for (const line of lines) {
+      for (let i = 0; i < tripTimes.length; i++) {
+        const trip_id = `${route_id}_${directionId}_${leftPad(i, 3, 0)}`
 
-      if (!line.length) {
-        direction2++
-        continue
-      }
-      const [, stopName, service_id, ...times] = line
-      if (service_id.trim().toLowerCase() !== 'semaine') continue
-
-      let j = 0
-      for (const trip of routeTrips[direction2]) {
-
-        const stop = stops.find((stop) => stop[1].trim() === stopName.trim())
-        let time = ''
-        if (!isNaN(times[j])) {
-          time = XLSX.SSF.parse_date_code(times[j])
-          time = `${leftPad(time.H, 2, 0)}:${leftPad(time.M, 2, 0)}`
-        }
-        stopTimes.push([
-          trip.trip_id,
-          time, // arrival_time,
-          time, // departure_time,
-          stop[0], // stop_id,
-          trip.stop_sequence, // stop_sequence,
-          stopName, // stop_headsign,
-          0, // pickup_type,
-          0, //drop_off_time,
-          '', // shape_dist_traveled,
-          0 // timepoint
+        tripIds.push(trip_id)
+        trips.push([
+          route_id,
+          service_id, // service_id
+          trip_id,
+          trip_headsign,
+          directionId, // direction_id,
+          '', // block_id,
+          '' //shape_id
         ])
-        j++
+      }
+
+      /**
+       * Save stop times
+       */
+      // A stops all times
+      for (const row of tripGroup) {
+        const [/*trip_headsign*/, stopName, /*service_id*/, ...times] = row
+        const stop = stops.find((stop) => stop[1].trim() === stopName.trim())
+
+        let stop_sequence = 0
+        for (let i = 0; i < times.length; i++) {
+          let time = ''
+          if (!isNaN(times[i])) {
+            time = XLSX.SSF.parse_date_code(times[i])
+            time = `${leftPad(time.H, 2, 0)}:${leftPad(time.M, 2, 0)}`
+            stop_sequence++
+          }
+          stopTimes.push([
+            tripIds[i],
+            time, // arrival_time,
+            time, // departure_time,
+            stop[0], // stop_id,
+            stop_sequence, // stop_sequence,
+            stopName, // stop_headsign,
+            0, // pickup_type,
+            0, //drop_off_time,
+            '', // shape_dist_traveled,
+            0 // timepoint
+          ])
+        }
       }
     }
   }
